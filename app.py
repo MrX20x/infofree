@@ -2,8 +2,8 @@ from functools import wraps
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from cachetools import TTLCache
-import lib2
 import asyncio
+import lib2
 
 app = Flask(__name__)
 CORS(app)
@@ -34,15 +34,14 @@ def get_account_info():
     if not region:
         return jsonify({"error": "Empty 'region' parameter"}), 400
 
-    # Async call
     try:
-        return_data = asyncio.run(
+        data = asyncio.run(
             lib2.GetAccountInformation(uid, "7", region, "/GetPlayerPersonalShow")
         )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    return jsonify(return_data)
+    return jsonify(data)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=3000, host="0.0.0.0")
+    app.run(debug=True, host="0.0.0.0", port=3000)
