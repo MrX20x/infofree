@@ -29,7 +29,7 @@ def cached_endpoint(ttl=300):
 
 
 # curl -X GET 'http://127.0.0.1:3000/api/account?uid=1813014615&region=ind'
-@app.route('/api/account')
+@app.route('/account')
 @cached_endpoint()
 def get_account_info():
     region = request.args.get('region')
