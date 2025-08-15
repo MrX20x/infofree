@@ -11,10 +11,10 @@ import asyncio
 app = Flask(__name__)
 CORS(app)
 
-# Ensure 'lib2' and 'proto' are importable
+# Ensure current folder is in path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Cache with a TTL of 5 minutes
+# Cache
 cache = TTLCache(maxsize=100, ttl=300)
 
 def cached_endpoint(ttl=300):
@@ -49,7 +49,6 @@ def get_account_info():
             "message": "Empty 'region' parameter. Please provide a valid 'region'."
         }), 400
 
-    # Use serverless-friendly asyncio
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -61,5 +60,5 @@ def get_account_info():
 
     return jsonify(return_data)
 
-if __name__ == '__main__':
-    app.run(debug=True, port=3000, host='0.0.0.0')
+if __name__ == "__main__":
+    app.run(debug=True, port=3000, host="0.0.0.0")
