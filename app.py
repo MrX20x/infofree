@@ -1,58 +1,71 @@
-from functools import wraps
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from cachetools import TTLCache
-import lib2
+# api/account.py
+import sys
+import os
 import json
 import asyncio
+from cachetools import TTLCache
 
-app = Flask(__name__)
-CORS(app)
+# Add project root to sys.path so 'lib2' and 'proto' can be imported
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
-# Create a cache with a TTL (time-to-live) of 300 seconds (5 minutes)
+import lib2  # your library that uses proto
+# proto folder should be at the same level as lib2
+
+# Cache with TTL of 5 minutes
 cache = TTLCache(maxsize=100, ttl=300)
 
-def cached_endpoint(ttl=300):
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            cache_key = (request.path, tuple(request.args.items()))
-            if cache_key in cache:
-                return cache[cache_key]
-            else:
-                result = func(*args, **kwargs)
-                cache[cache_key] = result
-                return result
-        return wrapper
-    return decorator
+async def fetch_account_info(uid, region):
+    """Fetch account information asynchronously"""
+    return await lib2.GetAccountInformation(uid, "7", region, "/GetPlayerPersonalShow")
 
+def handler(request):
+    """Vercel serverless function handler"""
+    # Extract query parameters
+    query = request.args
+    uid = query.get("uid")
+    region = query.get("region")
 
-
-# curl -X GET 'http://127.0.0.1:3000/api/account?uid=1813014615&region=ind'
-@app.route('/account')
-@cached_endpoint()
-def get_account_info():
-    region = request.args.get('region')
-    uid = request.args.get('uid')
-    
+    # Validation
     if not uid:
-        response = {
-            "error": "Invalid request",
-            "message": "Empty 'uid' parameter. Please provide a valid 'uid'."
+        return {
+            "statusCode": 400,
+            "body": json.dumps({
+                "error": "Invalid request",
+                "message": "Empty 'uid' parameter. Please provide a valid 'uid'."
+            }),
+            "headers": {"Content-Type": "application/json; charset=utf-8"}
         }
-        return jsonify(response), 400, {'Content-Type': 'application/json; charset=utf-8'}
 
     if not region:
-        response = {
-            "error": "Invalid request",
-            "message": "Empty 'region' parameter. Please provide a valid 'region'."
+        return {
+            "statusCode": 400,
+            "body": json.dumps({
+                "error": "Invalid request",
+                "message": "Empty 'region' parameter. Please provide a valid 'region'."
+            }),
+            "headers": {"Content-Type": "application/json; charset=utf-8"}
         }
-        return jsonify(response), 400, {'Content-Type': 'application/json; charset=utf-8'}
 
-    return_data = asyncio.run(lib2.GetAccountInformation(uid, "7", region, "/GetPlayerPersonalShow"))
-    formatted_json = json.dumps(return_data, indent=2, ensure_ascii=False)
-    return formatted_json, 200, {'Content-Type': 'application/json; charset=utf-8'}
+    # Check cache
+    cache_key = (uid, region)
+    if cache_key in cache:
+        return {
+            "statusCode": 200,
+            "body": json.dumps(cache[cache_key], ensure_ascii=False),
+            "headers": {"Content-Type": "application/json; charset=utf-8"}
+        }
 
+    # Fetch data asynchronously
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    data = loop.run_until_complete(fetch_account_info(uid, region))
+    loop.close()
 
-if __name__ == '__main__':
-    app.run(port=3000, host='0.0.0.0', debug=True)
+    # Store in cache
+    cache[cache_key] = data
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps(data, ensure_ascii=False),
+        "headers": {"Content-Type": "application/json; charset=utf-8"}
+    }
